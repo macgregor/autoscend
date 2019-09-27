@@ -530,6 +530,7 @@ boolean canDrinkSpeakeasyDrink(item drink); //Defined in autoscend/auto_clan.ash
 boolean drinkSpeakeasyDrink(item drink);					//Defined in autoscend/auto_clan.ash
 boolean drinkSpeakeasyDrink(string drink);					//Defined in autoscend/auto_clan.ash
 boolean eatFancyDog(string dog);							//Defined in autoscend/auto_clan.ash
+int fancyDogFullness(string dog);							//Defined in autoscend/auto_clan.ash
 boolean zataraClanmate(string who);							//Defined in autoscend/auto_clan.ash
 boolean zataraSeaside(string who);							//Defined in autoscend/auto_clan.ash
 float edMeatBonus();										//Defined in autoscend/auto_edTheUndying.ash

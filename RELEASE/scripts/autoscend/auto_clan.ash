@@ -454,7 +454,7 @@ boolean zataraClanmate(string who)
 	string clanName = get_property("auto_consultClan");
 	if (clanName != "")
 	{
-		changeClan(clanName);	
+		changeClan(clanName);
 	}
 	else
 	{
@@ -523,6 +523,27 @@ boolean zataraClanmate(string who)
 	return true;
 }
 
+int fancyDogFullness(string dog){
+	static int [string] dogFull;
+	dogFull["basic hot dog"] = 1;
+	dogFull["savage macho dog"] = 2;
+	dogFull["one with everything"] = 2;
+	dogFull["sly dog"] = 2;
+	dogFull["devil dog"] = 3;
+	dogFull["chilly dog"] = 3;
+	dogFull["ghost dog"] = 3;
+	dogFull["junkyard dog"] = 3;
+	dogFull["wet dog"] = 3;
+	dogFull["optimal dog"] = 1;
+	dogFull["sleeping dog"] = 2;
+	dogFull["video games hot dog"] = 3;
+
+	if(dogFull contains dog){
+		return dogFull[dog];
+	}
+	return -1;
+}
+
 boolean eatFancyDog(string dog)
 {
 	if(item_amount($item[Clan VIP Lounge Key]) == 0)
@@ -541,22 +562,9 @@ boolean eatFancyDog(string dog)
 
 	dog = to_lower_case(dog);
 
-	static int [string] dogFull;
 	static item [string] dogReq;
 	static int [string] dogAmt;
 	static int [string] dogID;
-	dogFull["basic hot dog"] = 1;
-	dogFull["savage macho dog"] = 2;
-	dogFull["one with everything"] = 2;
-	dogFull["sly dog"] = 2;
-	dogFull["devil dog"] = 3;
-	dogFull["chilly dog"] = 3;
-	dogFull["ghost dog"] = 3;
-	dogFull["junkyard dog"] = 3;
-	dogFull["wet dog"] = 3;
-	dogFull["optimal dog"] = 1;
-	dogFull["sleeping dog"] = 2;
-	dogFull["video games hot dog"] = 3;
 
 	dogReq["basic hot dog"] = $item[none];
 	dogReq["savage macho dog"] = $item[furry fur];
@@ -597,7 +605,8 @@ boolean eatFancyDog(string dog)
 	dogID["sleeping dog"] = -101;
 	dogID["video games hot dog"] = -103;
 
-	if(!(dogFull contains dog))
+	int dogFull = fancyDogFullness(dog);
+	if(dogFull == -1)
 	{
 		abort("Invalid hot dog: " + dog);
 	}
@@ -608,7 +617,7 @@ boolean eatFancyDog(string dog)
 		return false;
 	}
 
-	if(fullness_left() < dogFull[dog])
+	if(fullness_left() < dogFull)
 	{
 		return false;
 	}

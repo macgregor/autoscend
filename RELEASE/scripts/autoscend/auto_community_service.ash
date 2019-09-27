@@ -3,18 +3,33 @@ script "auto_community_service.ash"
 #	Some details derived some yojimbos_law's forum post:
 #	http://forums.kingdomofloathing.com/vb/showpost.php?p=4769933&postcount=345
 
-# TODO:
-#		- add power leveling at NEP (free fights) to reach level 4 for agua de vida
-#		- add run NEP (free fights) when low on meat to afford hot dogs/speakeasy drinks
-#		- add beach comb (free) for meat (some sea vegetables sell for 350 each)
-# 	- get cloud buff before power leveling/NEP
-#		- add flag to ignore that damn fortune cookie counter
-#		- early level combat can sometimes get stuck from low mp (free camp site rests might help)
-#		- fill stomach/spleen/liver at the end of day 1 (clip art and perfect cocktail support)
-#		- day 2, try to get pokefam +10 lb weight item from grass with extra pokegrow fertilizer
-#		- maybe wish for got milk?
+/*
+ * TODO:
+ *	- add power leveling at NEP (free fights) to reach level 4 for agua de vida
+ *	- add run NEP (free fights) when low on meat to afford hot dogs/speakeasy drinks
+ *	- add beach comb (free) for meat (some sea vegetables sell for 350 each)
+ *	- get cloud buff before power leveling/NEP
+ *	- add flag to ignore that damn fortune cookie counter
+ *	- early level combat can sometimes get stuck from low mp (free camp site rests might help)
+ *	- day 2, try to get pokefam +10 lb weight item from grass with extra pokegrow fertilizer
+ *	- efficiencies:
+ *		- body spradium from boxing day care (+5 fam weight, meat farming)
+ *		- glass of raw eggs from boxing daycare (weapon/spell damage +50%)
+ *		- double check may saber daily buff
+ *	- drinks:
+ *		- punch-drunk punch (1 drunk)
+ *		- bunch of sea grapes (1 drunk)
+ *		- perfect drinks (3 drunk)
+ *		- Morto Moreto (1 drunk, poison, clipart)
+ *	- food:
+ *		- glass of raw eggs (1 full)
+ *		- ultrafondue (3 full, clipart)
+ *		- spaghetti breakfast maybe
+ */
 
 static int[int] auto_cs_fastQuestList;
+
+boolean __cs_eat_stuff(int[item] menu, string hotdog, boolean craftMilk, boolean wishMilk);
 
 boolean LA_cs_communityService()
 {
@@ -174,10 +189,7 @@ boolean LA_cs_communityService()
 	}
 	if((my_daycount() == 2) && auto_haveWitchess() && have_skills($skills[Conspiratorial Whispers, Curse of Weaksauce, Sauceshell, Shell Up, Silent Slam]) && (have_skill($skill[Tattle]) || have_skill($skill[Meteor Lore]))  && possessEquipment($item[Dented Scepter]) && !possessEquipment($item[Battle Broom]) && (get_property("_auto_witchessBattles").to_int() < 5) && have_familiar($familiar[Galloping Grill]) && (my_ascensions() >= 100))
 	{
-		while((my_mp() < 120) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-		{
-			doRest();
-		}
+		while((my_mp() < 120) && doFreeRest());
 		if(equipped_item($slot[weapon]) != $item[Dented Scepter])
 		{
 			equip($slot[weapon], $item[Dented Scepter]);
@@ -390,6 +402,7 @@ boolean LA_cs_communityService()
 
 			if(!get_property("_chateauMonsterFought").to_boolean() && chateaumantegna_available() && (get_property("chateauMonster") == $monster[dairy goat]))
 			{
+				//TODO: why is this empty? Feels like maybe we should be fighting the goat?
 			}
 
 			if(chateaumantegna_available() && (get_property("chateauMonster") != $monster[dairy goat]) && (my_fullness() == 0) && !get_property("_photocopyUsed").to_boolean())
@@ -406,16 +419,6 @@ boolean LA_cs_communityService()
 				{
 					handleFaxMonster($monster[Dairy Goat], "cs_combatNormal");
 				}
-				if((item_amount($item[Glass of Goat\'s Milk]) > 0) && (freeCrafts() > 0) && (item_amount($item[Scrumptious Reagent]) > 0) && have_skill($skill[Advanced Saucecrafting]))
-				{
-					if(!have_skills($skills[Expert Corner-Cutter, Rapid Prototyping]) && have_skill($skill[Inigo\'s Incantation of Inspiration]))
-					{
-						shrugAT($effect[Inigo\'s Incantation of Inspiration]);
-						buffMaintain($effect[Inigo\'s Incantation of Inspiration], 100, 1, 5);
-					}
-
-					cli_execute("make milk of magnesium");
-				}
 				return true;
 			}
 
@@ -424,10 +427,7 @@ boolean LA_cs_communityService()
 			buffMaintain($effect[Singer\'s Faithful Ocelot], 15, 1, 1);
 			buffMaintain($effect[Fat Leon\'s Phat Loot Lyric], 11, 1, 1);
 
-			while((my_mp() < 40) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 40) && doFreeRest());
 
 			if((internalQuestStatus("questG07Myst") == 1) || (internalQuestStatus("questG08Moxie") == 1) || (internalQuestStatus("questG09Muscle") == 1))
 			{
@@ -1418,12 +1418,13 @@ boolean LA_cs_communityService()
 				buyUpTo(1, $item[Ben-Gal&trade; Balm], 25);
 			}
 
-			while(((total_free_rests() - get_property("timesRested").to_int()) > 4) && chateaumantegna_available())
-			{
+			// why is it doing this? it seems wasteful...
+			if((chateaumantegna_available() || auto_campawayAvailable()) && (total_free_rests() - get_property("timesRested").to_int()) > 4){
 				cli_execute("auto_post_adv");
-				doRest();
+				doFreeRest();
 			}
 
+			// TODO: abstract sauce potion making, this 6 lines of code is everywhere
 			if((item_amount($item[lemon]) > 0) && (item_amount($item[philter of phorce]) == 0) && (have_effect($effect[Phorcefullness]) == 0) && (freeCrafts() > 0) && (item_amount($item[Scrumptious Reagent]) > 0) && have_skill($skill[Advanced Saucecrafting]))
 			{
 				if(!have_skills($skills[Expert Corner-Cutter, Rapid Prototyping]) && have_skill($skill[Inigo\'s Incantation of Inspiration]))
@@ -1434,10 +1435,7 @@ boolean LA_cs_communityService()
 				cli_execute("make " + $item[Philter Of Phorce]);
 			}
 
-			while((my_mp() < 125) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 125) && doFreeRest());
 
 			if(!get_property("_lyleFavored").to_boolean())
 			{
@@ -1580,7 +1578,7 @@ boolean LA_cs_communityService()
 				temp = visit_url("place.php?whichplace=kgb&action=kgb_tab2", false);
 			}
 
-			if(get_cs_questCost(curQuest) > 10)
+			if(get_cs_questCost(curQuest) > 10 && get_property("auto_useWishes").to_boolean())
 			{
 				makeGenieWish($effect[Preemptive Medicine]);
 			}
@@ -1640,15 +1638,8 @@ boolean LA_cs_communityService()
 
 			buyUpTo(1, $item[Ben-Gal&trade; Balm]);
 
-			while((my_mp() < 50) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 125) && doFreeRest());
 
-			while((my_mp() < 125) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
 			buffMaintain($effect[Quiet Determination], 10, 1, 1);
 			buffMaintain($effect[Big], 15, 1, 1);
 			buffMaintain($effect[Song of Bravado], 100, 1, 1);
@@ -1740,10 +1731,7 @@ boolean LA_cs_communityService()
 				equip($slot[off-hand], $item[Saucepanic]);
 			}
 
-			while((my_mp() < 133) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 133) && doFreeRest());
 			buffMaintain($effect[Quiet Judgement], 10, 1, 1);
 			buffMaintain($effect[Big], 15, 1, 1);
 			buffMaintain($effect[Song of Bravado], 100, 1, 1);
@@ -1833,10 +1821,7 @@ boolean LA_cs_communityService()
 			januaryToteAcquire($item[Wad Of Used Tape]);
 			buyUpTo(1, $item[Hair Spray]);
 
-			while((my_mp() < 142) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 142) && doFreeRest());
 
 			if(have_skill($skill[Quiet Desperation]))
 			{
@@ -2111,10 +2096,7 @@ boolean LA_cs_communityService()
 				}
 			}
 
-			while((my_mp() < 27) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 27) && doFreeRest());
 			buffMaintain($effect[Empathy], 15, 1, 1);
 			buffMaintain($effect[Leash of Linguini], 12, 1, 1);
 			if(is_unrestricted($item[Clan Pool Table]) && (have_effect($effect[Billiards Belligerence]) == 0))
@@ -2174,10 +2156,7 @@ boolean LA_cs_communityService()
 
 	case 6:		#Weapon Damage
 		{
-			while((my_mp() < 50) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 50) && doFreeRest());
 
 			//This needs to be cleaned up.
 			if(((my_inebriety() == 5) || (my_inebriety() == 11)) && (have_effect($effect[In A Lather]) == 0))
@@ -2187,10 +2166,8 @@ boolean LA_cs_communityService()
 
 //			januaryToteAcquire($item[Broken Champagne Bottle]);
 
-			while((my_mp() < 207) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			// TODO: everywhere we do this free rest + buff maintain can be abstracted and made smarter
+			while((my_mp() < 207) && doFreeRest());
 
 			buffMaintain($effect[Song of the North], 100, 1, 1);
 			buffMaintain($effect[Bow-Legged Swagger], 100, 1, 1);
@@ -2225,9 +2202,9 @@ boolean LA_cs_communityService()
 			}
 
 			int restsLeft = total_free_rests() - get_property("timesRested").to_int();
-			while((my_level() < 8) && (restsLeft > 0) && chateaumantegna_available() && ((my_basestat(my_primestat()) + restsLeft) >= 53))
+			while((my_level() < 8) && (restsLeft > 0) && (chateaumantegna_available() || auto_campawayAvailable()) && ((my_basestat(my_primestat()) + restsLeft) >= 53))
 			{
-				doRest();
+				doFreeRest();
 				cli_execute("auto_post_adv");
 			}
 
@@ -2358,10 +2335,7 @@ boolean LA_cs_communityService()
 					doHottub();
 				}
 
-				while((my_mp() < 250) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-				{
-					doRest();
-				}
+				while((my_mp() < 250) && doFreeRest());
 				if(possessEquipment($item[Staff of the Headmaster\'s Victuals]) && can_equip($item[Staff of the Headmaster\'s Victuals]) && have_skill($skill[Spirit of Rigatoni]))
 				{
 					equip($slot[weapon], $item[Staff of the Headmaster\'s Victuals]);
@@ -2388,10 +2362,7 @@ boolean LA_cs_communityService()
 					useCocoon();
 				}
 
-				while((my_mp() < 250) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-				{
-					doRest();
-				}
+				while((my_mp() < 250) && doFreeRest());
 
 				if(possessEquipment($item[Astral Statuette]))
 				{
@@ -2463,10 +2434,7 @@ boolean LA_cs_communityService()
 
 	case 8:			#Non-Combat
 		{
-			while((my_mp() < 30) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 30) && doFreeRest());
 			buffMaintain($effect[Smooth Movements], 10, 1, 1);
 			buffMaintain($effect[The Sonata of Sneakiness], 20, 1, 1);
 			uneffect($effect[Dog Breath]);
@@ -2569,7 +2537,7 @@ boolean LA_cs_communityService()
 				autoChew(item_amount($item[Handful of Smithereens]), $item[Handful of Smithereens]);
 			}
 
-			if((my_adventures() < questCost) || (auto_mall_price($item[Pocket Wish]) < 35000))
+			if((my_adventures() < questCost) && get_property("auto_useWishes").to_boolean())
 			{
 				foreach eff in $effects[Chocolatesphere, Disquiet Riot, Patent Invisibility]
 				{
@@ -2652,10 +2620,7 @@ boolean LA_cs_communityService()
 
 			cs_eat_stuff(curQuest);
 
-			while((my_mp() < 154) && (get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-			{
-				doRest();
-			}
+			while((my_mp() < 154) && doFreeRest());
 
 			if(have_effect($effect[items.enh]) == 0)
 			{
@@ -2727,7 +2692,7 @@ boolean LA_cs_communityService()
 				use_skill(1, $skill[Incredible Self-Esteem]);
 			}
 
-			if(get_cs_questCost(curQuest) > 7)
+			if(get_cs_questCost(curQuest) > 7 && get_property("auto_useWishes").to_boolean())
 			{
 #				makeGenieWish($effect[Frosty]);
 				makeGenieWish($effect[Infernal Thirst]);
@@ -3270,9 +3235,9 @@ void cs_initializeDay(int day)
 
 			cli_execute("auto_post_adv");
 
-			if((get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
+			if((get_property("timesRested").to_int() < total_free_rests()) && (chateaumantegna_available() || auto_campawayAvailable()))
 			{
-				doRest();
+				doFreeRest();
 			}
 
 			set_property("auto_day_init", 2);
@@ -3309,15 +3274,6 @@ boolean do_chateauGoat()
 		{
 			chateaumantegna_usePainting("cs_combatNormal");
 		}
-		if((item_amount($item[Glass of Goat\'s Milk]) > 0) && (freeCrafts() > 0) && (item_amount($item[Scrumptious Reagent]) > 0))
-		{
-			if(!have_skills($skills[Expert Corner-Cutter, Rapid Prototyping]) && have_skill($skill[Inigo\'s Incantation of Inspiration]))
-			{
-				shrugAT($effect[Inigo\'s Incantation of Inspiration]);
-				buffMaintain($effect[Inigo\'s Incantation of Inspiration], 100, 1, 5);
-			}
-			cli_execute("make " + $item[Milk Of Magnesium]);
-		}
 		auto_sourceTerminalEducate($skill[Extract], $skill[Digitize]);
 		return true;
 	}
@@ -3334,9 +3290,8 @@ boolean cs_spendRests()
 	{
 		return false;
 	}
-	while((get_property("timesRested").to_int() < total_free_rests()) && chateaumantegna_available())
-	{
-		doRest();
+	while(haveFreeRestAvailable()){
+		doFreeRest();
 	}
 	return true;
 }
@@ -3350,16 +3305,6 @@ void cs_make_stuff(int curQuest)
 			cli_execute("make " + $item[Skeleton Key]);
 		}
 	}
-	if((item_amount($item[Milk of Magnesium]) == 0) && (item_amount($item[Glass of Goat\'s Milk]) > 0) && have_skill($skill[Advanced Saucecrafting]) && (freeCrafts() > 0) && (item_amount($item[Scrumptious Reagent]) > 0))
-	{
-		if(!have_skills($skills[Expert Corner-Cutter, Rapid Prototyping]) && have_skill($skill[Inigo\'s Incantation of Inspiration]))
-		{
-			shrugAT($effect[Inigo\'s Incantation of Inspiration]);
-			buffMaintain($effect[Inigo\'s Incantation of Inspiration], 100, 1, 5);
-		}
-		cli_execute("make " + $item[Milk Of Magnesium]);
-	}
-
 
 	if(my_daycount() == 1)
 	{
@@ -3547,142 +3492,192 @@ boolean cs_eat_spleen()
 	return oldSpleenUse != my_spleen_use();
 }
 
-boolean cs_eat_stuff(int quest)
-{
-	if(my_path() != "Community Service")
-	{
+boolean cs_eat_stuff(int quest){
+	if(my_path() != "Community Service"){
 		return false;
 	}
 
-	if((quest == 0) && (my_fullness() == 0))
-	{
-		if(auto_haveSourceTerminal())
-		{
-			if((item_amount($item[Source Essence]) < 10) && (item_amount($item[Browser Cookie]) == 0))
-			{
+	int[item] to_eat;
+	string hot_dog_to_eat;
+	int hypothetical_fullness = my_fullness();
+
+	int hypothetical_fullness_left(){
+		return fullness_limit() - hypothetical_fullness;
+	}
+
+	int hypothetical_eat(item food){
+		if(to_eat contains food){
+			to_eat[food]++;
+		} else{
+			to_eat[food] = 1;
+		}
+		hypothetical_fullness += food.fullness;
+	}
+
+	int hypothetical_eat(string hotdog){
+		int dogFull = fancyDogFullness(hotdog);
+		if(dogFull == -1){
+			abort("Invalid hot dog: " + hotdog);
+		}
+		hot_dog_to_eat = hotdog;
+		hypothetical_fullness += dogFull;
+	}
+
+	if(quest == 0 && my_fullness() == 0){
+		if(sl_haveSourceTerminal()){
+			if((item_amount($item[Source Essence]) < 10) && (item_amount($item[Browser Cookie]) == 0)){
 				return false;
 			}
 		}
-		if(item_amount($item[Milk of Magnesium]) > 0)
-		{
-			use(1, $item[Milk of Magnesium]);
-		}
-		if(get_property("auto_noSleepingDog").to_boolean() || have_skill($skill[Dog Tired]))
-		{
-			if(auto_sourceTerminalExtrudeLeft() > 0)
-			{
-				if(item_amount($item[Browser Cookie]) == 0)
-				{
-					auto_sourceTerminalExtrude($item[Browser Cookie]);
+
+		if(get_property("sl_noSleepingDog").to_boolean() || have_skill($skill[Dog Tired])){
+			if(sl_sourceTerminalExtrudeLeft() > 0){
+				if(item_amount($item[Browser Cookie]) == 0){
+					sl_sourceTerminalExtrude($item[Browser Cookie]);
 				}
 			}
 
-			if(item_amount($item[Browser Cookie]) > 0)
-			{
-				autoEat(1, $item[Browser Cookie]);
+			if(item_amount($item[Browser Cookie]) > 0){
+				hypothetical_eat($item[Browser Cookie]);
+			} else{
+				hypothetical_eat("savage macho dog");
 			}
-			else
-			{
-				eatFancyDog("savage macho dog");
-			}
-		}
-		else
-		{
-			eatFancyDog("sleeping dog");
+		} else {
+			hypothetical_eat("sleeping dog");
 		}
 
-		if((item_amount($item[Handful of Smithereens]) > 0) && (my_fullness() <= 3))
-		{
+		if((item_amount($item[Handful of Smithereens]) > 0) && (hypothetical_fullness <= 3)){
 			cli_execute("make " + $item[This Charming Flan]);
-			eat(1, $item[This Charming Flan]);
+			hypothetical_eat($item[This Charming Flan]);
 		}
-		if((item_amount($item[Meteoreo]) > 0) && (my_fullness() <= 4))
-		{
-			eat(1, $item[Meteoreo]);
+		if((item_amount($item[Meteoreo]) > 0) && (hypothetical_fullness <= 4)){
+			hypothetical_eat($item[Meteoreo]);
 		}
-		if((item_amount($item[Snow Berries]) > 1) && (my_fullness() <= 4))
-		{
+		if((item_amount($item[Snow Berries]) > 1) && (hypothetical_fullness <= 4)){
 			cli_execute("make " + $item[Snow Crab]);
-			eat(1, $item[Snow Crab]);
+			hypothetical_eat($item[Snow Crab]);
 		}
 	}
 
-	if(quest == 9)
-	{
-		if(item_amount($item[Weird Gazelle Steak]) > 0)
-		{
-			if(item_amount($item[Milk of Magnesium]) > 0)
-			{
-				use(1, $item[Milk of Magnesium]);
-			}
-			autoEat(1, $item[Weird Gazelle Steak]);
+	if(quest == 9){
+		if(item_amount($item[Weird Gazelle Steak]) > 0){
+			hypothetical_eat($item[Weird Gazelle Steak]);
 
-			if(get_property("auto_noSleepingDog").to_boolean())
-			{
-				if(auto_sourceTerminalExtrudeLeft() > 0)
-				{
-					if((item_amount($item[Browser Cookie]) == 0) && (fullness_left() >= 4))
-					{
-						auto_sourceTerminalExtrude($item[Browser Cookie]);
+			if(get_property("sl_noSleepingDog").to_boolean()){
+				if(sl_sourceTerminalExtrudeLeft() > 0){
+					if((item_amount($item[Browser Cookie]) == 0) && (hypothetical_fullness_left() >= 4)){
+						sl_sourceTerminalExtrude($item[Browser Cookie]);
 					}
 				}
 
-				if((item_amount($item[Browser Cookie]) > 0) && (fullness_left() >= 4))
-				{
-					autoEat(1, $item[Browser Cookie]);
+				if((item_amount($item[Browser Cookie]) > 0) && (hypothetical_fullness_left() >= 4)){
+					hypothetical_eat($item[Browser Cookie]);
+				} else {
+					hypothetical_eat("savage macho dog");
 				}
-				else
-				{
-					eatFancyDog("savage macho dog");
-				}
-			}
-			else
-			{
-				eatFancyDog("sleeping dog");
-			}
-			if((item_amount($item[Handful of Smithereens]) > 0) && (fullness_left() >= 2))
-			{
-				cli_execute("make " + $item[This Charming Flan]);
-				eat(1, $item[This Charming Flan]);
-			}
-			if((item_amount($item[Meteoreo]) > 0) && (fullness_left() >= 1))
-			{
-				eat(1, $item[Meteoreo]);
-			}
-			if((item_amount($item[Snow Berries]) > 1) && (fullness_left() >= 1))
-			{
-				cli_execute("make " + $item[Snow Crab]);
-				eat(1, $item[Snow Crab]);
+			} else{
+				hypothetical_eat("sleeping dog");
 			}
 
-		}
-	}
-	else if(quest == 10)
-	{
-		if((item_amount($item[Sausage Without A Cause]) > 0) && !get_property("auto_saveSausage").to_boolean())
-		{
-			if(item_amount($item[Milk of Magnesium]) > 0)
-			{
-				use(1, $item[Milk of Magnesium]);
+			if((item_amount($item[Handful of Smithereens]) > 0) && (hypothetical_fullness_left() >= 2)){
+				cli_execute("make " + $item[This Charming Flan]);
+				hypothetical_eat($item[This Charming Flan]);
 			}
-			eat(1, $item[Sausage Without A Cause]);
-			if(item_amount($item[Ice Harvest]) > 0)
-			{
-				eat(1, $item[Ice Harvest]);
+			if((item_amount($item[Meteoreo]) > 0) && (hypothetical_fullness_left() >= 1)){
+				hypothetical_eat($item[Meteoreo]);
 			}
-			if(item_amount($item[Snow Berries]) > 1)
-			{
+			if((item_amount($item[Snow Berries]) > 1) && (hypothetical_fullness_left() >= 1)){
 				cli_execute("make " + $item[Snow Crab]);
-				eat(1, $item[Snow Crab]);
+				hypothetical_eat($item[Snow Crab]);
+			}
+		}
+	} else if(quest == 10){
+		if((item_amount($item[Sausage Without A Cause]) > 0) && !get_property("sl_saveSausage").to_boolean()){
+			hypothetical_eat($item[Sausage Without A Cause]);
+
+			if(item_amount($item[Ice Harvest]) > 0){
+				hypothetical_eat($item[Ice Harvest]);
+			}
+			if(item_amount($item[Snow Berries]) > 1){
+				cli_execute("make " + $item[Snow Crab]);
+				hypothetical_eat($item[Snow Crab]);
 			}
 
 			int questCost = get_cs_questCost(quest);
 
-			if((fullness_left() >= 2) && (questCost > 20))
-			{
-				eatFancyDog("junkyard dog");
+			if((fullness_left() >= 2) && (questCost > 20)){
+				hypothetical_eat("junkyard dog");
 			}
 		}
+	}
+
+	// TODO: determine when appropriate to wish for milk
+	return __cs_eat_stuff(to_eat, hot_dog_to_eat, true, true);
+}
+
+boolean __cs_eat_stuff(int[item] menu, string hotdog, boolean craftMilk, boolean wishMilk){
+	int milk_craftable(){
+		int craftable = 0;
+		if(have_skill($skill[Advanced Saucecrafting]) && item_amount($item[Glass of Goat\'s Milk]) > 0) && item_amount($item[Scrumptious Reagent]) > 0){
+			craftable += min($item[Glass of Goat\'s Milk]), item_amount($item[Scrumptious Reagent]))
+		}
+		return craftable;
+	}
+
+	int milk_available(){
+		return milk_craftable() + item_amount($item[Milk of Magnesium]);
+	}
+
+	int menu_fullness(int[item] menu, string hotdog){
+		int potentialFullness = 0;
+		if(hotdog != ""){
+			potentialFullness = fancyDogFullness(hotdog)
+		}
+
+		foreach i, amount in menu{
+			potentialFullness += (i.fullness * amount);
+		}
+		return potentialFullness;
+	}
+
+	int milkThreshold = 10;
+	int potentialFullness = menu_fullness(menu, hotdog);
+	int stomach_left = fullness_limit() - my_fullness();
+
+	if(menu_fullness > stomach_left){
+		print("I cant eat all that.");
+		return false;
+	}
+
+	// handle Milk of Magnesium
+	if(potentialFullness >= milkThreshold){
+		while(have_effect($effect[Got Milk]) < potentialFullness){
+			if(milk_available() > 0 && craftMilk){
+				if(!dealWithMilkOfMagnesium(false)){
+					print("CS: Something went wrong making/using Milk of Magnesium, continuing on.");
+					break;
+				}
+				dealWithMilkOfMagnesium(false);
+			} else if(get_property("sl_useWishes").to_boolean() && wishMilk){
+				if(!makeGenieWish($effect[Got Milk])){
+					print("CS: Something went wrong wishing for Got Milk, continuing on.");
+					break;
+				}
+			} else{
+				break;
+			}
+		}
+	}
+
+	// actually eat it all now
+	if(hotdog != ""){
+		eatFancyDog(hotdog);
+	}
+	foreach i, amount in menu{
+		if(!slEat(amount, i)){
+			print("CS: couldnt eat all " + amount + " " + i);
+			return false;
+		};
 	}
 	return true;
 }
@@ -5104,7 +5099,6 @@ boolean cs_healthMaintain(int target){
 	while(my_hp() < target){
 		print("attempting to heal");
 		if(!useCocoon()){
-			print("I'm in here now");
 			//cocoon failed, try a free rest to restore some hp/mp and try again
 			if((chateaumantegna_available() || auto_campawayAvailable()) && doFreeRest()){
 				continue;

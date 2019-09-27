@@ -598,12 +598,13 @@ boolean dealWithMilkOfMagnesium(boolean useAdv)
 
 		if(item_amount($item[Scrumptious Reagent]) > 0)
 		{
-			if(useAdv)
-			{
-				cli_execute("make " + $item[Milk Of Magnesium]);
-			}
-			else if((freeCrafts() > 0) && have_skill($skill[Rapid Prototyping]))
-			{
+			boolean haveInigos = have_effect($effect[Inigo\'s Incantation of Inspiration]) > 5;
+			boolean canInigoIfNeeded = (have_skill($skill[Inigo\'s Incantation of Inspiration]) && my_mp() > mp_cost($skill[Inigo\'s Incantation of Inspiration]));
+			if(useAdv || freeCrafts() > 0 || haveInigos || canInigoIfNeeded){
+				if(freeCrafts() == 0 && canInigoIfNeeded){
+					shrugAT($effect[Inigo\'s Incantation of Inspiration]);
+					buffMaintain($effect[Inigo\'s Incantation of Inspiration], 100, 1, 5);
+				}
 				cli_execute("make " + $item[Milk Of Magnesium]);
 			}
 		}
@@ -1557,13 +1558,13 @@ void consumeStuff()
 	}
 }
 
-int SL_ORGAN_STOMACH = 1;
-int SL_ORGAN_LIVER   = 2;
+int AUTO_ORGAN_STOMACH = 1;
+int AUTO_ORGAN_LIVER   = 2;
 
-int SL_OBTAIN_NULL  = 100;
-int SL_OBTAIN_CRAFT = 101;
-int SL_OBTAIN_PULL  = 102;
-int SL_OBTAIN_BUY   = 103;
+int AUTO_OBTAIN_NULL  = 100;
+int AUTO_OBTAIN_CRAFT = 101;
+int AUTO_OBTAIN_PULL  = 102;
+int AUTO_OBTAIN_BUY   = 103;
 
 // Used internally for knapsack optimization.
 record ConsumeAction
@@ -1578,32 +1579,32 @@ record ConsumeAction
 	float desirability; // adv count that will be used for optimization
 	                    // (lower for pulls, higher for buffs/tower keys)
 
-	int organ;          // SL_ORGAN_*
-	int howToGet;       // SL_OBTAIN_*
+	int organ;          // AUTO_ORGAN_*
+	int howToGet;       // AUTO_OBTAIN_*
 };
 
 string consumable_name(ConsumeAction action)
 {
 	string name = "<name not found>";
 	if (action.it != $item[none]) name = to_string(action.it);
-	else if (action.organ == SL_ORGAN_LIVER) name = cafeDrinkName(action.cafeId);
-	else if (action.organ == SL_ORGAN_STOMACH) name = cafeFoodName(action.cafeId);
+	else if (action.organ == AUTO_ORGAN_LIVER) name = cafeDrinkName(action.cafeId);
+	else if (action.organ == AUTO_ORGAN_STOMACH) name = cafeFoodName(action.cafeId);
 	return name;
 }
 
 string to_pretty_string(ConsumeAction action)
 {
-	string organ_name = action.organ == SL_ORGAN_STOMACH ? "fullness" : "inebriety";
+	string organ_name = action.organ == AUTO_ORGAN_STOMACH ? "fullness" : "inebriety";
 	string logline = consumable_name(action) + " for " + action.adventures + " base adv (" + action.size + " " + organ_name + ")";
-	if (action.howToGet == SL_OBTAIN_PULL)
+	if (action.howToGet == AUTO_OBTAIN_PULL)
 	{
 		logline += " [PULL]";
 	}
-	if (action.howToGet == SL_OBTAIN_CRAFT)
+	if (action.howToGet == AUTO_OBTAIN_CRAFT)
 	{
 		logline += " [CRAFT]";
 	}
-	if (action.howToGet == SL_OBTAIN_BUY)
+	if (action.howToGet == AUTO_OBTAIN_BUY)
 	{
 		logline += " [BUY]";
 	}
@@ -1626,34 +1627,34 @@ string to_debug_string(ConsumeAction action)
 
 ConsumeAction MakeConsumeAction(item it)
 {
-	int organ = it.inebriety > 0 ? SL_ORGAN_LIVER : SL_ORGAN_STOMACH;
+	int organ = it.inebriety > 0 ? AUTO_ORGAN_LIVER : AUTO_ORGAN_STOMACH;
 	int size = max(it.inebriety, it.fullness);
 	float adv = expectedAdventuresFrom(it);
-	return new ConsumeAction(it, 0, size, adv, adv, organ, SL_OBTAIN_NULL);
+	return new ConsumeAction(it, 0, size, adv, adv, organ, AUTO_OBTAIN_NULL);
 }
 
 boolean autoPrepConsume(ConsumeAction action)
 {
 	print(to_debug_string(action));
-	if(action.howToGet == SL_OBTAIN_PULL)
+	if(action.howToGet == AUTO_OBTAIN_PULL)
 	{
 		print("autoPrepConsume: Pulling a " + action.it, "blue");
-		action.howToGet = SL_OBTAIN_NULL;
+		action.howToGet = AUTO_OBTAIN_NULL;
 		return pullXWhenHaveY(action.it, 1, item_amount(action.it));
 	}
-	else if(action.howToGet == SL_OBTAIN_CRAFT)
+	else if(action.howToGet == AUTO_OBTAIN_CRAFT)
 	{
 		print("autoPrepConsume: Crafting a " + action.it, "blue");
-		action.howToGet = SL_OBTAIN_NULL;
+		action.howToGet = AUTO_OBTAIN_NULL;
 		return create(1, action.it);
 	}
-	else if(action.howToGet == SL_OBTAIN_BUY)
+	else if(action.howToGet == AUTO_OBTAIN_BUY)
 	{
 		print("autoPrepConsume: Buying a " + action.it, "blue");
-		action.howToGet = SL_OBTAIN_NULL;
+		action.howToGet = AUTO_OBTAIN_NULL;
 		return buy(1, action.it);
 	}
-	else if (action.howToGet == SL_OBTAIN_NULL)
+	else if (action.howToGet == AUTO_OBTAIN_NULL)
 	{
 		print("autoPrepConsume: Doing nothing to get a " + action.it, "blue");
 	}
@@ -1662,33 +1663,33 @@ boolean autoPrepConsume(ConsumeAction action)
 
 boolean autoConsume(ConsumeAction action)
 {
-	if (action.howToGet != SL_OBTAIN_NULL)
+	if (action.howToGet != AUTO_OBTAIN_NULL)
 	{
 		abort("ConsumeAction not prepped: " + to_debug_string(action));
 	}
 
-	if (action.organ == SL_ORGAN_LIVER)
+	if (action.organ == AUTO_ORGAN_LIVER)
 	{
 		buffMaintain($effect[Ode to Booze], 20, 1, action.size);
 	}
 	if(action.cafeId != 0)
 	{
-		if (action.organ == SL_ORGAN_LIVER)
+		if (action.organ == AUTO_ORGAN_LIVER)
 		{
 			return autoDrinkCafe(1, action.cafeId);
 		}
-		else if (action.organ == SL_ORGAN_STOMACH)
+		else if (action.organ == AUTO_ORGAN_STOMACH)
 		{
 			return autoEatCafe(1, action.cafeId);
 		}
 	}
 	else if(action.it != $item[none])
 	{
-		if (action.organ == SL_ORGAN_LIVER)
+		if (action.organ == AUTO_ORGAN_LIVER)
 		{
 			return autoDrink(1, action.it);
 		}
-		else if (action.organ == SL_ORGAN_STOMACH)
+		else if (action.organ == AUTO_ORGAN_STOMACH)
 		{
 			return autoEat(1, action.it);
 		}
@@ -1722,23 +1723,23 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 
 	// type is "eat" or "drink"
 	int type  = 0;
-	if (_type == "eat")   type = SL_ORGAN_STOMACH;
-	else if (_type == "drink") type = SL_ORGAN_LIVER;
+	if (_type == "eat")   type = AUTO_ORGAN_STOMACH;
+	else if (_type == "drink") type = AUTO_ORGAN_LIVER;
 	else return false;
 
 	boolean canConsume(item it)
 	{
-		return type == SL_ORGAN_STOMACH ? canEat(it) : canDrink(it);
+		return type == AUTO_ORGAN_STOMACH ? canEat(it) : canDrink(it);
 	}
 
 	int organLeft()
 	{
-		return type == SL_ORGAN_STOMACH ? fullness_left() : inebriety_left();
+		return type == AUTO_ORGAN_STOMACH ? fullness_left() : inebriety_left();
 	}
 
 	int organCost(item it)
 	{
-		return type == SL_ORGAN_STOMACH ? it.fullness : it.inebriety;
+		return type == AUTO_ORGAN_STOMACH ? it.fullness : it.inebriety;
 	}
 
 	int[item] pullables;
@@ -1818,17 +1819,17 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 		{
 			int n = count(actions);
 			actions[n] = MakeConsumeAction(it);
-			if (obtain_mode == SL_OBTAIN_PULL)
+			if (obtain_mode == AUTO_OBTAIN_PULL)
 			{
 				// Is this a good estimate of how many adventures a pull is worth? I don't know!
 				// This could be a property, I don't know.
 				actions[n].desirability -= 7.0;
 			}
-			if (type == SL_ORGAN_STOMACH && is_unrestricted($item[special seasoning]))
+			if (type == AUTO_ORGAN_STOMACH && is_unrestricted($item[special seasoning]))
 			{
 				actions[n].desirability += min(1.0, item_amount($item[special seasoning]).to_float() * it.fullness / fullness_left());
 			}
-			if ((obtain_mode == SL_OBTAIN_PULL) && (i == 0) &&
+			if ((obtain_mode == AUTO_OBTAIN_PULL) && (i == 0) &&
 					((it == $item[Boris's key lime pie] && wantBorisPie) ||
 					(it == $item[Jarlsberg's key lime pie] && wantJarlsbergPie) ||
 					(it == $item[Sneaky Pete's key lime pie] && wantPetePie)))
@@ -1836,7 +1837,7 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 				print("If we pulled and ate a " + it + " we could skip getting a fat loot token...");
 				actions[n].desirability += 25;
 			}
-			if (obtain_mode == SL_OBTAIN_CRAFT)
+			if (obtain_mode == AUTO_OBTAIN_CRAFT)
 			{
 				int turns_to_craft = creatable_turns(it, i + 1, false) - creatable_turns(it, i, false);
 				actions[n].desirability -= turns_to_craft;
@@ -1847,29 +1848,29 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 
 	foreach it, howmany in pullables
 	{
-		add(it, SL_OBTAIN_PULL, howmany);
+		add(it, AUTO_OBTAIN_PULL, howmany);
 	}
 	foreach it, howmany in small_owned
 	{
-		add(it, SL_OBTAIN_NULL, howmany);
+		add(it, AUTO_OBTAIN_NULL, howmany);
 	}
 	foreach it, howmany in buyables
 	{
-		add(it, SL_OBTAIN_BUY, howmany);
+		add(it, AUTO_OBTAIN_BUY, howmany);
 	}
 	foreach it, howmany in large_owned
 	{
-		add(it, SL_OBTAIN_NULL, howmany);
+		add(it, AUTO_OBTAIN_NULL, howmany);
 	}
 	foreach it, howmany in craftables
 	{
-		add(it, SL_OBTAIN_CRAFT, howmany);
+		add(it, AUTO_OBTAIN_CRAFT, howmany);
 	}
 
 	// Now, to load cafe consumables. This has some TCRS-specific code.
 
-	if(type == SL_ORGAN_LIVER && !gnomads_available()) return false;
-	if(type == SL_ORGAN_STOMACH && !canadia_available()) return false;
+	if(type == AUTO_ORGAN_LIVER && !gnomads_available()) return false;
+	if(type == AUTO_ORGAN_STOMACH && !canadia_available()) return false;
 
 	// Add daily special
 	if (daily_special() != $item[none] && canConsume(daily_special()))
@@ -1884,10 +1885,10 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 		}
 	}
 
-	if(!in_tcrs()) 
+	if(!in_tcrs())
 	{
 		// write in hard-coded adventure values for IPA, the best one
-		if(type == SL_ORGAN_LIVER)
+		if(type == AUTO_ORGAN_LIVER)
 		{
 			// Gnomish Microbrewery has a single best drink
 			int limit = 1 + min(my_meat()/100, inebriety_left()/3);
@@ -1895,10 +1896,10 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 			{
 				int size = 3;
 				float adv = 11.0/3.0;
-				actions[count(actions)] = new ConsumeAction($item[none], -3, size, adv, adv, SL_ORGAN_LIVER, SL_OBTAIN_NULL);
+				actions[count(actions)] = new ConsumeAction($item[none], -3, size, adv, adv, AUTO_ORGAN_LIVER, AUTO_OBTAIN_NULL);
 			}
 		}
-		if(type == SL_ORGAN_STOMACH)
+		if(type == AUTO_ORGAN_STOMACH)
 		{
 			// Chez Snootee does not have a single best food
 
@@ -1908,7 +1909,7 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 			{
 				int size = 3;
 				float adv = 3.5;
-				actions[count(actions)] = new ConsumeAction($item[none], -1, size, adv, adv, SL_ORGAN_LIVER, SL_OBTAIN_NULL);
+				actions[count(actions)] = new ConsumeAction($item[none], -1, size, adv, adv, AUTO_ORGAN_LIVER, AUTO_OBTAIN_NULL);
 			}
 
 			// As Jus Gezund Heit
@@ -1917,7 +1918,7 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 			{
 				int size = 4;
 				float adv = 5.0;
-				actions[count(actions)] = new ConsumeAction($item[none], -2, size, adv, adv, SL_ORGAN_LIVER, SL_OBTAIN_NULL);
+				actions[count(actions)] = new ConsumeAction($item[none], -2, size, adv, adv, AUTO_ORGAN_LIVER, AUTO_OBTAIN_NULL);
 			}
 
 			// As Jus Gezund Heit
@@ -1926,7 +1927,7 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 			{
 				int size = 5;
 				float adv = 7.0;
-				actions[count(actions)] = new ConsumeAction($item[none], -3, size, adv, adv, SL_ORGAN_LIVER, SL_OBTAIN_NULL);
+				actions[count(actions)] = new ConsumeAction($item[none], -3, size, adv, adv, AUTO_ORGAN_LIVER, AUTO_OBTAIN_NULL);
 			}
 		}
 		return true;
@@ -1940,9 +1941,9 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 
 	_CAFE_CONSUMABLE_TYPE [int] cafe_stuff;
 	string filename = "";
-	if (type == SL_ORGAN_LIVER)
+	if (type == AUTO_ORGAN_LIVER)
 		filename = "TCRS_" + my_class().to_string().replace_string(" ", "_") + "_" + my_sign() + "_cafe_booze.txt";
-	else if (type == SL_ORGAN_STOMACH)
+	else if (type == AUTO_ORGAN_STOMACH)
 		filename = "TCRS_" + my_class().to_string().replace_string(" ", "_") + "_" + my_sign() + "_cafe_food.txt";
 
 	print("Loading " + filename, "blue");
@@ -1961,7 +1962,7 @@ boolean loadConsumables(string _type, ConsumeAction[int] actions)
 			{
 				int size = r.space;
 				float adv = r.space * tcrs_expectedAdvPerFill(r.quality);
-				actions[count(actions)] = new ConsumeAction($item[none], -3, size, adv, adv, SL_ORGAN_LIVER, SL_OBTAIN_NULL);
+				actions[count(actions)] = new ConsumeAction($item[none], -3, size, adv, adv, AUTO_ORGAN_LIVER, AUTO_OBTAIN_NULL);
 			}
 		}
 	}
@@ -2065,7 +2066,7 @@ boolean auto_knapsackAutoConsume(string type, boolean simulate)
 	foreach i in result
 	{
 		string name = consumable_name(actions[i]);
-		if (actions[i].it != $item[none] && actions[i].howToGet != SL_OBTAIN_PULL)
+		if (actions[i].it != $item[none] && actions[i].howToGet != AUTO_OBTAIN_PULL)
 		{
 			normal_consumables[actions[i].it] += 1;
 		}
